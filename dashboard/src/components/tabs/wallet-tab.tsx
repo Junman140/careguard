@@ -18,6 +18,57 @@ export interface WalletTabProps {
   locale?: Locale;
 }
 
+function FundingModal({
+  isOpen,
+  onClose,
+  onContinue,
+  locale = "en",
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onContinue: () => void;
+  locale?: Locale;
+}) {
+  const t = getTranslations(locale);
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={onClose} />
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-lg max-w-sm w-full p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-3">
+            {t.wallet.fundModal}
+          </h2>
+          <p className="text-sm text-slate-600 mb-4">
+            {t.wallet.fundModalDesc}
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700 font-medium flex items-start gap-2">
+              <span className="text-blue-600 font-bold flex-shrink-0">⚠</span>
+              <span>{t.wallet.fundModalNote}</span>
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onContinue}
+              className="flex-1 px-4 py-2 bg-sky-500 text-white rounded-lg text-sm font-medium hover:bg-sky-600 transition-all"
+            >
+              {t.wallet.fundContinue}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function WalletTab({
   agentInfo,
   walletBalance,
@@ -32,6 +83,7 @@ export function WalletTab({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toastFallback, setToastFallback] = useState<string | undefined>(undefined);
+  const [fundingModalOpen, setFundingModalOpen] = useState(false);
 
   const handleCopy = async (text: string, id: string) => {
     const result = await copyText(text);
@@ -59,6 +111,15 @@ export function WalletTab({
           setToastMsg(null);
           setToastFallback(undefined);
         }}
+      />
+      <FundingModal
+        isOpen={fundingModalOpen}
+        onClose={() => setFundingModalOpen(false)}
+        onContinue={() => {
+          setFundingModalOpen(false);
+          window.open("https://faucet.circle.com", "_blank", "noopener,noreferrer");
+        }}
+        locale={locale}
       />
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h2 className="text-sm font-semibold text-slate-700 mb-4">{t.wallet.title}</h2>
@@ -159,14 +220,12 @@ export function WalletTab({
               {t.wallet.viewExplorer}
             </a>
           )}
-          <a
-            href="https://faucet.circle.com"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => setFundingModalOpen(true)}
             className="flex-1 text-center px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 active:bg-slate-300 cursor-pointer transition-all"
           >
             {t.wallet.fund}
-          </a>
+          </button>
         </div>
       </div>
 
