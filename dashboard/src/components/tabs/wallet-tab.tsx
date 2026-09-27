@@ -168,6 +168,11 @@ export function WalletTab({
             {t.wallet.fund}
           </a>
         </div>
+        {agentInfo?.agentWallet && (
+          <p className="mt-2 text-xs text-slate-500 text-center">
+            Stellar Explorer shows a public record of this wallet's transactions on the blockchain
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-6">

@@ -92,11 +92,18 @@ export function SettingsTab({
 
   const handleSave = async () => {
     setSaving(true);
+    // Trim, de-duplicate, and filter empty medication entries
+    const medicationList = [...new Set(
+      form.medications
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean)
+    )];
     await onUpdateProfile({
       recipient: {
         name: form.recipientName.trim() || recipient.name,
         age: form.recipientAge ? Number(form.recipientAge) : recipient.age,
-        medications: form.medications.split(",").map((m) => m.trim()).filter(Boolean),
+        medications: medicationList,
         doctor: form.doctor.trim() || recipient.doctor,
         insurance: form.insurance.trim() || recipient.insurance,
       },
@@ -217,6 +224,7 @@ export function SettingsTab({
                 className={editClass + " w-full"}
                 value={form.medications}
                 onChange={(e) => setForm((f) => ({ ...f, medications: e.target.value }))}
+                placeholder="e.g., Lisinopril, Metformin, Atorvastatin"
                 aria-label={t.settings.medications}
               />
             ) : (

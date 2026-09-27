@@ -189,7 +189,7 @@ export function OverviewTab({
           role="alert"
           className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 text-sm text-yellow-800"
         >
-          Task may be incomplete — agent ran out of steps
+          This task took longer than expected and may not have finished completely. Try running it again or breaking it into smaller tasks.
         </div>
       )}
 
