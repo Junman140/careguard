@@ -7,7 +7,6 @@ import { Card } from "../primitives/card";
 import type { AgentResult, AgentLlmError, SpendingData } from "../types";
 import type { RecipientProfile } from "../../lib/types";
 import { agentFetch } from "../../lib/agent-fetch";
-import { formatCurrency, getTranslations, type Locale } from "../../i18n";
 import { formatCurrency, formatDate, formatNumber, getTranslations, type Locale } from "../../i18n";
 
 export interface OverviewTabProps {
@@ -29,6 +28,66 @@ const TASKS = {
   bill: "Audit Rosa's hospital bill from General Hospital and pay the corrected amount if errors are found.",
   block: "Pay a $600 medical bill to General Hospital for Rosa's recent surgery follow-up.",
 };
+
+/** Issue #1267: Format agent response text with better structure and readability. */
+function FormattedResponse({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Lines that start with numbers followed by . or ) are likely list items
+  const lines = text.split("\n");
+  const isLikelyList = lines.some((line) => /^\s*\d+[\.)]\s/.test(line));
+
+  // Simple heuristic: if response is very long, truncate it
+  const maxChars = 500;
+  const isTruncated = text.length > maxChars && !expanded;
+  const displayText = isTruncated ? text.slice(0, maxChars) + "…" : text;
+
+  if (isLikelyList) {
+    // Render as list with structure
+    return (
+      <div className="space-y-2">
+        {lines.map((line, idx) => {
+          const trimmed = line.trim();
+          if (!trimmed) return null;
+          return (
+            <div key={idx} className="text-sm text-slate-600">
+              {/^\s*\d+[\.)]\s/.test(trimmed) ? (
+                <div className="ml-2">
+                  <span className="font-medium">{trimmed}</span>
+                </div>
+              ) : (
+                <div className="text-slate-600">{trimmed}</div>
+              )}
+            </div>
+          );
+        })}
+        {isTruncated && (
+          <button
+            onClick={() => setExpanded(true)}
+            className="text-xs text-sky-600 hover:text-sky-700 underline mt-2"
+          >
+            Show more
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Fall back to paragraph rendering with truncation
+  return (
+    <div>
+      <p className="text-sm text-slate-600 whitespace-pre-wrap">{displayText}</p>
+      {isTruncated && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="text-xs text-sky-600 hover:text-sky-700 underline mt-2"
+        >
+          Show more
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function OverviewTab({
   spending,
@@ -206,9 +265,7 @@ export function OverviewTab({
           <h2 className="text-sm font-semibold text-slate-700 mb-3">
             {t.overview.agentResponse}
           </h2>
-          <p className="text-sm text-slate-600 whitespace-pre-wrap">
-            {agentResult.response}
-          </p>
+          <FormattedResponse text={agentResult.response} />
           <div className="mt-4 text-xs text-slate-400">
             {agentResult.toolCalls.length} tool calls | API cost: $
             {agentResult.spending.spending.serviceFees.toFixed(4)}

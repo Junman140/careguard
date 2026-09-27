@@ -6,6 +6,12 @@ This file is auto-updated by the release workflow on each `v*` tag push.
 
 ## [Unreleased]
 
+### Fixed
+- **dashboard:** #1276 Settings tab now warns before discarding unsaved edits. Added confirmation dialog and beforeunload handler when caregiver navigates away mid-edit, plus prominent warning banner during edit mode.
+- **dashboard:** #1270 Policy limit fields now show real-world helper text. Added context-specific guidance below Daily Spending Limit, Monthly Spending Limit, Medication/Bill Budget, and Approval Threshold to help caregivers set sensible values.
+- **dashboard:** #1267 Agent Response card now renders with better structure. Detects and formats numbered lists, adds 'Show more' truncation for long responses (>500 chars), keeping raw text accessible if parsing fails.
+- **dashboard:** #1246 Agent log error entries now visually stand out. Added red styling, warning icon, and "Error:" label prefix to entries with errorDetail, making failures immediately scannable in the collapsed log view.
+
 ### Changed
 - **deps:** bump `dashboard/sonner` from `^2.0.3` to `^2.0.7` to align with root `sonner ^2.0.7` — eliminates duplicate toast render paths between server and dashboard. Verified `Toaster` props (`richColors`, `closeButton`, `position="top-right"` in `dashboard/src/components/ui/toaster.tsx:3`) and `toast.error()` usage in `dashboard/src/hooks/use-agent-state.ts:4,378` are unchanged between 2.0.3→2.0.7 (2.0.4 lift-interaction removal, 2.0.5 CSS fix, 2.0.6 pnpm/right-click fix, 2.0.7 `testId`/multi-toaster support — no breaking prop changes).
 - **deps:** upgrade `@sentry/node` from `^8.45.1` to `^10.62.0` to align with `dashboard/@sentry/nextjs ^10.62.0` on the v10 line (OTEL v2). Migrated `shared/sentry.ts:58` `Sentry.init()` from deprecated `Sentry.Handlers.requestHandler/errorHandler` (removed in v8) to function-based `requestDataIntegration`/`httpIntegration`/`expressIntegration` with `Sentry.setupExpressErrorHandler(app)` fallback via `attachSentry` (`shared/sentry.ts:128`). Error capture and breadcrumbs verified via `beforeSend` redaction path; SDK versions now aligned: root `@sentry/node ^10.62.0` ↔ dashboard `@sentry/nextjs ^10.62.0` (which bundles `@sentry/node 10.62.0`).

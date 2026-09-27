@@ -22,6 +22,15 @@ const FIELDS: Array<keyof SpendingPolicyInput> = [
   "holdTimeSeconds",
 ];
 
+/** Helper text for fields (#1270) — real-world context to guide non-technical caregivers. */
+const FIELD_HELPERS: Record<string, string> = {
+  dailyLimit: "Typical daily medication costs range from $20–$50. Medical appointments and procedures vary widely.",
+  monthlyLimit: "Most households budget $800–$1,500/month for combined medications, bills, and copayments.",
+  medicationMonthlyBudget: "Common medications average $100–$300/month. Multi-drug regimens may run higher.",
+  billMonthlyBudget: "Routine medical bills (copays, labs) average $100–$400/month; major procedures cost more.",
+  approvalThreshold: "Set this to flag payments above a certain amount for your manual review before they go through.",
+};
+
 /** Per-field HTML input constraints — kept in sync with schemas.ts (#211). */
 const FIELD_CONFIG: Record<
   keyof SpendingPolicyInput,
@@ -212,6 +221,11 @@ export function PolicyTab({
               {!errMsg && warnMsg && (
                 <p id={errorId} className="mt-1 text-xs text-amber-600">
                   Warning: {warnMsg}
+                </p>
+              )}
+              {FIELD_HELPERS[key] && !errMsg && (
+                <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                  {FIELD_HELPERS[key]}
                 </p>
               )}
           </div>
