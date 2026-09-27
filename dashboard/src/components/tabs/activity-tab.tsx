@@ -236,20 +236,20 @@ export function ActivityTab({
         </div>
       </div>
       <div
-        className="bg-slate-900 rounded-xl p-4 font-mono text-xs text-green-400 max-h-48 overflow-y-auto"
+        className="bg-white rounded-xl border border-slate-200 p-4 text-xs text-slate-700 max-h-48 overflow-y-auto"
         aria-live="polite"
       >
         <div aria-hidden="true">
           {agentLog.length === 0 ? (
-            <span className="text-slate-500">{t.noActivity}</span>
+            <span className="text-slate-400">{t.noActivity}</span>
           ) : (
             <>
               {!showAllLogEntries && agentLog.length > 50 && (
-                <div className="text-slate-400 mb-2">
+                <div className="text-slate-500 mb-2 text-xs">
                   Showing last 50 of {agentLog.length} entries.{" "}
                   <button
                     onClick={() => setShowAllLogEntries(true)}
-                    className="text-sky-400 hover:text-sky-300 underline"
+                    className="text-sky-600 hover:text-sky-700 underline"
                   >
                     Show all
                   </button>
@@ -257,15 +257,15 @@ export function ActivityTab({
               )}
               {(showAllLogEntries ? agentLog : agentLog.slice(-50)).map(
                 (entry) => (
-                  <div key={entry.id}>
+                  <div key={entry.id} className="mb-1 text-slate-700">
                     {entry.errorDetail ? (
                       <details className="group">
-                        <summary className="cursor-pointer list-none flex items-center gap-1 hover:text-green-300">
+                        <summary className="cursor-pointer list-none flex items-center gap-1 hover:text-slate-900">
                           <span className="text-xs opacity-60 group-open:opacity-100">▸</span>
                           {entry.message}
                         </summary>
                         <div className="ml-4 mt-1 space-y-1">
-                          <pre className="text-xs text-red-400 whitespace-pre-wrap break-all bg-slate-800 p-2 rounded">
+                          <pre className="text-xs text-red-700 whitespace-pre-wrap break-all bg-red-50 border border-red-200 p-2 rounded">
                             {entry.errorDetail}
                           </pre>
                           <button
@@ -278,7 +278,7 @@ export function ActivityTab({
                                 if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = orig; }, 1500); }
                               }
                             }}
-                            className="text-[10px] text-sky-400 hover:text-sky-300 underline"
+                            className="text-[10px] text-sky-600 hover:text-sky-700 underline"
                           >
                             Copy error
                           </button>
@@ -291,10 +291,10 @@ export function ActivityTab({
                 ),
               )}
               {showAllLogEntries && agentLog.length > 50 && (
-                <div className="text-slate-400 mt-2">
+                <div className="text-slate-500 mt-2 text-xs">
                   <button
                     onClick={() => setShowAllLogEntries(false)}
-                    className="text-sky-400 hover:text-sky-300 underline"
+                    className="text-sky-600 hover:text-sky-700 underline"
                   >
                     Show last 50
                   </button>
