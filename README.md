@@ -167,7 +167,7 @@ For a single-command boot of the full stack — server, dashboard, redis, promet
 # 1. Configure .env (same as above)
 cp .env.example .env
 
-# 2. Start everything
+# 2. Start everything (server + dashboard + redis + monitoring stack)
 docker compose up
 
 # 3. Open the apps
@@ -176,6 +176,40 @@ docker compose up
 #   Prometheus: http://localhost:9090
 #   Grafana:    http://localhost:3030  (admin / admin by default)
 #   Redis:      localhost:6379
+```
+
+### Seed data scripts
+
+Use these scripts to populate `data/` with synthetic test data for dashboard development:
+
+```bash
+# Generate synthetic care recipients (default: 5)
+npm run seed:recipients -- --count 10
+
+# Generate pharmacy order history (default: 20, add --include-blocked for over-budget orders)
+npm run seed:orders -- --count 50 --include-blocked
+
+# Generate medication adherence records for a specific recipient
+npm run seed:adherence -- --recipient rosa_garcia --days 30
+
+# Reset data/ to a clean state (prompts unless --yes is passed)
+npm run reset:data -- --yes
+```
+
+#### Backend-only development (skip dashboard/monitoring)
+
+To speed up local development when working only on backend services, start just the server and redis:
+
+```bash
+# Server + redis only (no dashboard, prometheus, or grafana)
+docker compose up --profile=
+```
+
+Or explicitly without monitoring:
+
+```bash
+# Server + redis + dashboard, but skip prometheus/grafana
+docker compose up --profile=full
 ```
 
 The default `docker-compose.yml` builds the production-shape multi-stage images. The auto-loaded `docker-compose.override.yml` swaps the `server` and `dashboard` services for hot-reload dev mode (mounts the source tree, runs `npm run dev`).
@@ -189,6 +223,13 @@ docker compose -f docker-compose.yml up
 To tear everything down (including volumes — drops the spending log, redis data, grafana dashboards):
 
 ```bash
+# Safer wrapper — shows what will be deleted and prompts for confirmation
+npm run docker:down:clean
+
+# Skip the prompt in CI or scripted use
+npm run docker:down:clean -- --yes
+
+# Raw command (no confirmation — use with care)
 docker compose down -v
 ```
 
@@ -229,16 +270,16 @@ hosting setup, CI validation, and how the x402 `X-PAYMENT` auth scheme works.
 
 ```bash
 # Install dependencies (if not already done)
-pnpm install
+npm install --legacy-peer-deps
 
 # Run all tests (root backend + dashboard)
-pnpm test
+npm run test:all
 
 # Watch mode
-pnpm test:watch
+npm run test:watch
 
 # Run tests with coverage
-pnpm test -- --coverage
+npm test -- --coverage
 ```
 
 Tests are organized in two workspaces:
@@ -249,6 +290,9 @@ Tests are organized in two workspaces:
 Shared test helpers (environment scrubber, fetch mock, Horizon mock) live in `tests/setup.ts`.
 
 > **Branch protection:** The `main` branch requires the CI check (`ci`) to pass before merging. Ensure all typecheck, lint, and test steps are green on your PR.
+
+For provider development, run `node --import tsx scripts/test-pricing-providers.ts --list`
+to print registered provider names and configuration without making network calls.
 
 ---
 

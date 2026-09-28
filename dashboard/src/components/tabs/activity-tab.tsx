@@ -40,6 +40,63 @@ export interface ActivityTabProps {
   locale?: Locale;
 }
 
+/** Plain-language explanation for each transaction status (#1269). */
+const STATUS_EXPLANATIONS: Record<string, string> = {
+  completed:
+    "The payment went through successfully and was recorded on the Stellar network.",
+  pending:
+    "Waiting to be processed. Held payments count down in the Approvals tab and are approved automatically when the hold time ends unless cancelled.",
+  approved:
+    "Approved and in progress — the payment is being completed on the network.",
+  blocked:
+    "The payment was stopped before any funds moved. This can mean a spending-policy limit was hit, the wallet had insufficient funds, or the network transaction failed.",
+  disputed:
+    "A charge in this transaction is being disputed. See the Bills tab for audit details.",
+  cancelled:
+    "The payment was cancelled before it completed. No funds were sent.",
+  rejected:
+    "The payment was refused and did not go through.",
+};
+
+function statusExplanation(status: string): string {
+  return STATUS_EXPLANATIONS[status] ?? "Current state of this transaction.";
+}
+
+/**
+ * Status badge with a touch-friendly (click/tap, not hover-only) explanation.
+ * Collapsed view keeps the original compact badge; expanding reveals what the
+ * status means, plus the block reason for blocked transactions when present.
+ */
+function StatusBadge({ status, reason }: { status: string; reason?: string }) {
+  const explanation = statusExplanation(status);
+  return (
+    <details className="inline-block text-left group">
+      <summary
+        title={explanation}
+        className="list-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sky-500 rounded"
+      >
+        <span
+          className={`px-2 py-0.5 rounded text-xs ${status === "completed"
+            ? "bg-green-100 text-green-700"
+            : status === "blocked"
+              ? "bg-red-100 text-red-700"
+              : "bg-amber-100 text-amber-700"
+            }`}
+        >
+          {status}
+        </span>
+        <span className="sr-only"> — {explanation}</span>
+      </summary>
+      <div className="mt-1 w-48 rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-600 shadow-sm">
+        <p>{explanation}</p>
+        {status === "blocked" && reason && (
+          <p className="mt-1 font-medium text-red-600">Reason: {reason}</p>
+        )}
+      </div>
+    </details>
+  );
+}
+
 export function ActivityTab({
   recipient,
   agentLog,
@@ -163,33 +220,36 @@ export function ActivityTab({
           )}
           <button
             onClick={() => setAgentLog([])}
+            title={t.clearLogTitle}
             className="text-xs text-amber-500 hover:text-amber-700 hover:underline active:text-amber-800 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 rounded px-1"
           >
             Clear Log
           </button>
+          <span aria-hidden="true" className="h-4 w-px bg-slate-300" />
           <button
             onClick={() => setConfirmOpen(true)}
-            className="text-xs text-red-500 hover:text-red-700 hover:underline active:text-red-800 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500 rounded px-1"
+            title={t.resetTitle}
+            className="text-xs font-medium text-red-600 border border-red-200 bg-red-50 rounded-md px-2 py-1 hover:bg-red-100 hover:border-red-300 hover:text-red-700 active:bg-red-200 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500"
           >
             {t.reset}
           </button>
         </div>
       </div>
       <div
-        className="bg-slate-900 rounded-xl p-4 font-mono text-xs text-green-400 max-h-48 overflow-y-auto"
+        className="bg-white rounded-xl border border-slate-200 p-4 text-xs text-slate-700 max-h-48 overflow-y-auto"
         aria-live="polite"
       >
         <div aria-hidden="true">
           {agentLog.length === 0 ? (
-            <span className="text-slate-500">{t.noActivity}</span>
+            <span className="text-slate-400">{t.noActivity}</span>
           ) : (
             <>
               {!showAllLogEntries && agentLog.length > 50 && (
-                <div className="text-slate-400 mb-2">
+                <div className="text-slate-500 mb-2 text-xs">
                   Showing last 50 of {agentLog.length} entries.{" "}
                   <button
                     onClick={() => setShowAllLogEntries(true)}
-                    className="text-sky-400 hover:text-sky-300 underline"
+                    className="text-sky-600 hover:text-sky-700 underline"
                   >
                     Show all
                   </button>
@@ -197,15 +257,27 @@ export function ActivityTab({
               )}
               {(showAllLogEntries ? agentLog : agentLog.slice(-50)).map(
                 (entry) => (
-                  <div key={entry.id}>
+                  <div key={entry.id} className="mb-1 text-slate-700">
                     {entry.errorDetail ? (
                       <details className="group">
-                        <summary className="cursor-pointer list-none flex items-center gap-1 hover:text-green-300">
+                        <summary className="cursor-pointer list-none flex items-center gap-1 text-red-400 hover:text-red-300 font-medium">
                           <span className="text-xs opacity-60 group-open:opacity-100">▸</span>
-                          {entry.message}
+                          <svg
+                            className="w-3 h-3 shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                            aria-hidden="true"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          Error: {entry.message}
                         </summary>
                         <div className="ml-4 mt-1 space-y-1">
-                          <pre className="text-xs text-red-400 whitespace-pre-wrap break-all bg-slate-800 p-2 rounded">
+                          <pre className="text-xs text-red-700 whitespace-pre-wrap break-all bg-red-50 border border-red-200 p-2 rounded">
                             {entry.errorDetail}
                           </pre>
                           <button
@@ -218,7 +290,7 @@ export function ActivityTab({
                                 if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = orig; }, 1500); }
                               }
                             }}
-                            className="text-[10px] text-sky-400 hover:text-sky-300 underline"
+                            className="text-[10px] text-sky-600 hover:text-sky-700 underline"
                           >
                             Copy error
                           </button>
@@ -231,10 +303,10 @@ export function ActivityTab({
                 ),
               )}
               {showAllLogEntries && agentLog.length > 50 && (
-                <div className="text-slate-400 mt-2">
+                <div className="text-slate-500 mt-2 text-xs">
                   <button
                     onClick={() => setShowAllLogEntries(false)}
-                    className="text-sky-400 hover:text-sky-300 underline"
+                    className="text-sky-600 hover:text-sky-700 underline"
                   >
                     Show last 50
                   </button>
@@ -272,8 +344,13 @@ export function ActivityTab({
                     <select
                       value={pageSize}
                       onChange={(e) => {
-                        setPageSize(Number(e.target.value));
-                        setCurrentPage(0);
+                        const nextSize = Number(e.target.value);
+                        setPageSize(nextSize);
+                        // Keep the first visible row in view across the page-size
+                        // change instead of silently jumping back to page 1 (#1283).
+                        setCurrentPage(
+                          Math.floor((currentPage * pageSize) / nextSize),
+                        );
                       }}
                       className="px-2 py-1 text-xs border border-slate-300 rounded bg-white"
                     >
@@ -385,16 +462,13 @@ export function ActivityTab({
                             : tx.amount.toFixed(2)}
                         </td>
                         <td className="px-4 py-2 text-right">
-                          <span
-                            className={`px-2 py-0.5 rounded text-xs ${tx.status === "completed"
-                              ? "bg-green-100 text-green-700"
-                              : tx.status === "blocked"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-amber-100 text-amber-700"
-                              }`}
-                          >
-                            {tx.status}
-                          </span>
+                          <StatusBadge
+                            status={tx.status}
+                            reason={
+                              (tx as { blockedReason?: string }).blockedReason ??
+                              (tx as { blockReason?: string }).blockReason
+                            }
+                          />
                         </td>
                         <td className="px-4 py-2 text-right">
                           <TxLink hash={tx.stellarTxHash} txHashStatus={tx.txHashStatus} />

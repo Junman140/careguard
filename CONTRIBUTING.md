@@ -12,24 +12,15 @@ npm run setup   # generates testnet wallets
 
 See [QUICKSTART.md](QUICKSTART.md) for full environment setup.
 
-## Testing
+## Package Manager
 
-Run `npm test` for the unit and integration test suite. Run `npm run e2e` for
-the normal Playwright end-to-end suite; use `npm run e2e:debug` when debugging
-locally because it opens Playwright in headed UI mode. The CI-facing `e2e`
-script remains unchanged.
+**npm is the authoritative package manager for this repository.** Root and
+dashboard CI installs use the corresponding `package-lock.json` files with
+`npm ci`; update those lockfiles with npm when changing dependencies.
 
-`npm run lint` currently only runs TypeScript with `tsc --noEmit`; it is not a
-style linter because this repository does not currently configure ESLint,
-Biome, or another style-linting tool. `npm run typecheck` runs the project
-build-mode type check (`tsc -b`). Both script names remain available for their
-existing uses. Adding a real style linter is a future follow-up, outside the
-scope of these commands.
-
-Before pushing changes that affect API routes or schemas, run
-`npm run gen-openapi -- --check` to verify that the committed
-`docs/openapi.yml` is current. This check is suitable for CI or a pre-push
-hook; run `npm run gen-openapi` first when it reports a stale spec.
+The root `pnpm-lock.yaml` and `pnpm-workspace.yaml` are legacy compatibility
+artifacts for older local workflows and are not updated or used as the source
+of truth by CI. New development and dependency changes should use npm.
 
 ## Node.js Version Policy
 
@@ -44,17 +35,93 @@ This project requires **Node.js 22** and will refuse to install on earlier versi
 
 If you use [nvm](https://github.com/nvm-sh/nvm), running `nvm use` in the project root will activate the correct version automatically.
 
+To reproduce a production-only bug locally, see [docs/RENDER-LOCAL-PARITY.md](docs/RENDER-LOCAL-PARITY.md) for a full mapping of `render.yaml` settings to their `.env` equivalents.
+
 **Why Node 22?** The server and agent entry-points use `--experimental-strip-types` and `--experimental-transform-types`, which reached stable shape in Node 22. Running on Node 20 will fail silently in some code paths and loudly in others.
 
 ## Development Workflow
 
 1. Fork the repo and create a branch from `main`
 2. Make your changes with tests where applicable
-3. Run `npm test` (root) and `cd dashboard && npm test` before pushing
-4. Add an entry to `CHANGELOG.md` if your change is user-facing (new feature, bug fix, API change, or breaking change). Skip this for docs-only edits, internal refactors with no behavior change, and CI/config tweaks with no user-visible effect. Follow the existing Keep-a-Changelog style in `CHANGELOG.md:1`.
-5. Open a pull request — CI must be green before merge
+3. During active development, use `npm run test:changed` to run only tests affected by your changes (faster iteration)
+4. Before pushing, run the full test suite: `npm test` (root) and `cd dashboard && npm test`
+5. Add an entry to `CHANGELOG.md` if your change is user-facing (new feature, bug fix, API change, or breaking change). Skip this for docs-only edits, internal refactors with no behavior change, and CI/config tweaks with no user-visible effect. Follow the existing Keep-a-Changelog style in `CHANGELOG.md:1`.
+6. Open a pull request — CI must be green before merge
+
+### Contributor Checks
+
+Verify the audit log locally with the human-readable check:
+
+```bash
+npx tsx scripts/verify-audit-log.ts
+```
+
+For CI or other automation, use `--json` to emit `{ "ok": boolean, "errors": [...] }`.
+The command exits non-zero when verification fails in either output mode:
+
+```bash
+npx tsx scripts/verify-audit-log.ts --json
+```
+
+When developing a pricing provider, list the registered providers and their
+configuration without making network calls:
+
+```bash
+node --import tsx scripts/test-pricing-providers.ts --list
+```
+
+To inspect the local pharmacy pricing SQLite DB (pharmacies, drugs, and prices):
+
+```bash
+# Full summary
+npm run inspect:pharmacy-db
+
+# Filter to a single drug
+npm run inspect:pharmacy-db -- --drug lisinopril
+```
+
+See [services/pharmacy-api/README.md](services/pharmacy-api/README.md) for schema details and how to update prices.
 
 When cutting a release, update [`docs/release/compatibility-matrix.md`](docs/release/compatibility-matrix.md) with the new version row (Node, SDK, and API contract versions). See [docs/release/versioning.md](docs/release/versioning.md) for the full release process.
+
+## Test Layout
+
+CareGuard splits tests across two projects configured via [`vitest.workspace.ts`](vitest.workspace.ts). This workspace configuration organizes tests into distinct project boundaries based on execution environment and responsibility.
+
+### Project Boundaries & Glob Patterns
+
+| Project | Config File | Glob Patterns | Environment | Description |
+|---------|-------------|---------------|-------------|-------------|
+| **Root** | [`vitest.config.ts`](vitest.config.ts) | `agent/**/__tests__/**/*.test.{ts,tsx}`<br>`agent/**/evals/**/*.spec.{ts,tsx}`<br>`services/**/__tests__/**/*.test.{ts,tsx}`<br>`shared/**/__tests__/**/*.test.{ts,tsx}`<br>`scripts/**/__tests__/**/*.test.{ts,tsx}`<br>`tests/**/*.test.{ts,tsx}` | `node` | Backend APIs, AI agent logic, shared libraries, and utility scripts |
+| **Dashboard** | [`dashboard/vitest.config.ts`](dashboard/vitest.config.ts) | `dashboard/src/**/*.test.{ts,tsx}`<br>`dashboard/tests/**/*.test.{ts,tsx}` | `jsdom` | Next.js dashboard UI components, hooks, and client-side logic |
+
+### Running Tests
+
+- **Root project tests (`npm test`):** Running `npm test` in the repository root executes tests for the **root project** only (`vitest run`).
+- **All workspace tests (`npm run test:all`):** Running `npm run test:all` executes tests across **both workspace projects** (root + dashboard) via `vitest.workspace.ts`.
+- **Dashboard tests directly (`cd dashboard && npm test`):** Dashboard tests can also be run independently by entering `dashboard/` and running `npm test` or `npx vitest run`, which runs inside `dashboard/` using the `jsdom` environment.
+
+### Running a Single Project or Specific Test File
+
+To execute tests for a single workspace project from the repository root:
+
+```bash
+# Run only root project tests
+npx vitest --project root
+
+# Run only dashboard project tests
+npx vitest --project ./dashboard/vitest.config.ts
+```
+
+To run a single test file:
+
+```bash
+# Target a backend / root test file
+npx vitest agent/__tests__/wallet-balance.test.ts
+
+# Target a dashboard test file
+npx vitest --project ./dashboard/vitest.config.ts dashboard/src/__tests__/stellar-network.test.ts
+```
 
 ## Dependency Management
 
@@ -185,6 +252,22 @@ npm run clear:stale-locks -- --yes
 
 Use `--root=<path>` for a different data directory and
 `--older-than-minutes=<n>` to adjust the stale-lock threshold.
+## Environment Variable Sync
+
+When adding a new environment variable:
+
+1. Add it to `.env.example` with documentation
+2. Run `npm run check:env-sync` to verify `.env.example` and `scripts/check-env-vars.ts` are aligned
+3. Run `npm run check:env-vars` to validate the variable is actually used in the codebase
+
+The `check:env-sync` script is also available as a pre-commit hook (optional); add it to your git hooks configuration:
+
+```bash
+npm run check:env-sync
+```
+
+This prevents `.env.example` drift (new vars in one file but not the other).
+
 ## Troubleshooting
 
 > **First step for any setup or runtime failure:** run `npm run check:env-vars` (which executes `scripts/check-env-vars.ts:65`) to validate that every key in `.env.example` is actually referenced in the codebase and to flag unused or missing vars. Its output (`⚠️  unused variables` / `✅ All environment variables ...`) often points directly at the missing `OZ_FACILITATOR_API_KEY` or `LLM_API_KEY`. See `scripts/check-env-vars.ts:14` for how it parses `.env.example`.

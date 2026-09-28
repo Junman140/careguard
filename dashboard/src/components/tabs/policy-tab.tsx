@@ -9,6 +9,7 @@ import {
 } from "../../lib/schemas";
 import { POLICY_FIELD_T_KEY as FIELD_T_KEY } from "../../lib/policy-field-labels";
 import type { SpendingData } from "../types";
+import { Bar } from "../primitives/bar";
 import { Toast } from "../primitives/toast";
 import { getTranslations, type Locale } from "../../i18n";
 
@@ -20,6 +21,15 @@ const FIELDS: Array<keyof SpendingPolicyInput> = [
   "approvalThreshold",
   "holdTimeSeconds",
 ];
+
+/** Helper text for fields (#1270) — real-world context to guide non-technical caregivers. */
+const FIELD_HELPERS: Record<string, string> = {
+  dailyLimit: "Typical daily medication costs range from $20–$50. Medical appointments and procedures vary widely.",
+  monthlyLimit: "Most households budget $800–$1,500/month for combined medications, bills, and copayments.",
+  medicationMonthlyBudget: "Common medications average $100–$300/month. Multi-drug regimens may run higher.",
+  billMonthlyBudget: "Routine medical bills (copays, labs) average $100–$400/month; major procedures cost more.",
+  approvalThreshold: "Set this to flag payments above a certain amount for your manual review before they go through.",
+};
 
 /** Per-field HTML input constraints — kept in sync with schemas.ts (#211). */
 const FIELD_CONFIG: Record<
@@ -58,6 +68,35 @@ interface PolicyChangeRow {
   after: number;
   increased: boolean;
   doubled: boolean;
+  delta?: number;
+}
+
+function getImpactExplanation(rows: PolicyChangeRow[]): string {
+  const increases = rows.filter((r) => r.increased);
+  if (increases.length === 0) return "";
+
+  const deltas = increases.map((row) => {
+    const delta = row.after - row.before;
+    if (row.key === "monthlyLimit") {
+      return `the monthly limit by $${delta.toFixed(2)}`;
+    } else if (row.key === "medicationMonthlyBudget") {
+      return `the medication budget by $${delta.toFixed(2)}`;
+    } else if (row.key === "billMonthlyBudget") {
+      return `the bill budget by $${delta.toFixed(2)}`;
+    } else if (row.key === "dailyLimit") {
+      const monthlyDelta = delta * 30;
+      return `the daily limit by $${delta.toFixed(2)} (up to $${monthlyDelta.toFixed(2)}/month)`;
+    } else if (row.key === "approvalThreshold") {
+      return `the approval threshold by $${delta.toFixed(2)}`;
+    }
+    return "";
+  }).filter(Boolean);
+
+  if (deltas.length === 0) return "";
+  if (deltas.length === 1) {
+    return `In practice, this increases ${deltas[0]} without requiring your approval first.`;
+  }
+  return `In practice, this increases: ${deltas.join(", ")} — all without requiring your approval first.`;
 }
 
 export interface PolicyTabProps {
@@ -213,32 +252,105 @@ export function PolicyTab({
                   Warning: {warnMsg}
                 </p>
               )}
+              {FIELD_HELPERS[key] && !errMsg && (
+                <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                  {FIELD_HELPERS[key]}
+                </p>
+              )}
+          </div>
+        );
+      })}
+        {spending && (
+          <div className="border border-dashed border-slate-300 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium text-slate-600">
+                {t.policyPreview.title}
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">
+                {t.policyPreview.unsaved}
+              </span>
             </div>
-          );
-        })}
+            <div className="space-y-3">
+              <Bar
+                label={t.budget.medications}
+                spent={spending.spending.medications}
+                budget={Number(policyForm.medicationMonthlyBudget)}
+                locale={locale}
+              />
+              <Bar
+                label={t.budget.medicalBills}
+                spent={spending.spending.bills}
+                budget={Number(policyForm.billMonthlyBudget)}
+                locale={locale}
+              />
+            </div>
+          </div>
+        )}
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onForceSync}
-            className="flex-1 py-2 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300 transition-all cursor-pointer"
-          >
-            {t.policy.refresh}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (spending?.policy) setPolicyForm(spending.policy);
-              setPolicyDirty(false);
-            }}
-            className="flex-1 py-2 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300 transition-all cursor-pointer"
-          >
-            {t.policy.discard}
-          </button>
+          <div className="flex-1 flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={onForceSync}
+              title={t.policy.refreshHint}
+              className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300 transition-all cursor-pointer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-4 h-4"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+                />
+              </svg>
+              {t.policy.refresh}
+            </button>
+            <span className="text-[10px] text-slate-400 text-center">
+              {t.policy.refreshHint}
+            </span>
+          </div>
+          <div className="flex-1 flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (spending?.policy) setPolicyForm(spending.policy);
+                setPolicyDirty(false);
+              }}
+              title={t.policy.discardHint}
+              className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300 transition-all cursor-pointer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-4 h-4"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
+                />
+              </svg>
+              {t.policy.discard}
+            </button>
+            <span className="text-[10px] text-slate-400 text-center">
+              {t.policy.discardHint}
+            </span>
+          </div>
         </div>
         <button
           type="submit"
           disabled={!validation.isValid}
-          className={`w-full py-2 rounded-lg text-sm font-medium transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${policySaved
+          className={`w-full py-2 rounded-lg text-sm font-medium transition-colors duration-700 ease-in-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${policySaved
               ? "bg-green-500 text-white"
               : "bg-sky-500 text-white hover:bg-sky-600 active:bg-sky-700"
             }`}
@@ -264,10 +376,15 @@ export function PolicyTab({
             >
               Confirm policy change
             </h3>
-            <p className="text-xs text-amber-700 mb-4">
+            <p className="text-xs text-amber-700 mb-2">
               You are raising one or more limits. This increases your spending
               exposure — please review before saving.
             </p>
+            {getImpactExplanation(confirmRows) && (
+              <p className="text-xs text-slate-700 mb-4 p-2 bg-amber-50 rounded border border-amber-200">
+                {getImpactExplanation(confirmRows)}
+              </p>
+            )}
 
             <ul className="space-y-2 mb-4">
               {confirmRows.map((row) => (

@@ -40,9 +40,10 @@ export function MedicationsTab({ agentResult, recipient, locale = "en" }: Medica
           <h2 className="text-sm font-semibold text-slate-700">
             {t.title}
           </h2>
-          {hasPriceResults && (
+          <div className="flex flex-col items-end gap-1">
             <button
               onClick={() => {
+                if (!hasPriceResults) return;
                 try {
                   const priceResults = agentResult!.toolCalls
                     .filter((t) => t.tool === "compare_pharmacy_prices")
@@ -63,11 +64,24 @@ export function MedicationsTab({ agentResult, recipient, locale = "en" }: Medica
                   toast.error("Couldn't parse medication result — try again");
                 }
               }}
-              className="px-3 py-1.5 bg-sky-50 text-sky-700 rounded-lg text-xs font-medium hover:bg-sky-100 active:bg-sky-200 cursor-pointer transition-all"
+              disabled={!hasPriceResults}
+              title={hasPriceResults ? undefined : t.downloadPdfHint}
+              aria-describedby={
+                !hasPriceResults ? "medications-download-hint" : undefined
+              }
+              className="px-3 py-1.5 bg-sky-50 text-sky-700 rounded-lg text-xs font-medium hover:bg-sky-100 active:bg-sky-200 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-sky-50"
             >
               {t.downloadPdf}
             </button>
-          )}
+            {!hasPriceResults && (
+              <span
+                id="medications-download-hint"
+                className="text-[10px] text-slate-400"
+              >
+                {t.downloadPdfHint}
+              </span>
+            )}
+          </div>
         </div>
         <div className="space-y-3">
           {MEDS.map((drug) => {
@@ -110,29 +124,45 @@ export function MedicationsTab({ agentResult, recipient, locale = "en" }: Medica
             {t.drugInteractions}
           </h2>
           {/* Stable key: tool-call id (or input composite) survives list reordering. */}
-          {interactionCalls.map((t) => (
-            <div key={t.id ?? `interaction-${JSON.stringify(t.input)}`} className="space-y-2">
-              <p className="text-sm text-slate-600">{t.result.summary}</p>
-              {t.result.interactions?.map((ix: any) => (
+          <div className="space-y-4">
+            {interactionCalls.map((t) => {
+              const interactions = t.result.interactions ?? [];
+              return (
                 <div
-                  key={`${ix.drug1}-${ix.drug2}`}
-                  className={`p-3 rounded-lg text-sm ${ix.severity === "severe"
-                    ? "bg-red-50 border border-red-200"
-                    : ix.severity === "moderate"
-                      ? "bg-amber-50 border border-amber-200"
-                      : "bg-blue-50 border border-blue-200"
-                    }`}
+                  key={t.id ?? `interaction-${JSON.stringify(t.input)}`}
+                  className="rounded-lg border border-slate-200 p-4"
                 >
-                  <div className="font-medium">
-                    {ix.drug1} + {ix.drug2} ({ix.severity})
-                  </div>
-                  <div className="text-xs mt-1 text-slate-600">
-                    {ix.recommendation}
-                  </div>
+                  {t.result.summary && (
+                    <p className="text-sm text-slate-600">{t.result.summary}</p>
+                  )}
+                  {interactions.length > 0 && (
+                    <div
+                      className={`space-y-2 ${t.result.summary ? "mt-4 border-t border-slate-200 pt-4" : ""}`}
+                    >
+                      {interactions.map((ix: any) => (
+                        <div
+                          key={`${ix.drug1}-${ix.drug2}`}
+                          className={`p-3 rounded-lg text-sm ${ix.severity === "severe"
+                            ? "bg-red-50 border border-red-200"
+                            : ix.severity === "moderate"
+                              ? "bg-amber-50 border border-amber-200"
+                              : "bg-blue-50 border border-blue-200"
+                            }`}
+                        >
+                          <div className="font-medium">
+                            {ix.drug1} + {ix.drug2} ({ix.severity})
+                          </div>
+                          <div className="text-xs mt-1 text-slate-600">
+                            {ix.recommendation}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

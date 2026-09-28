@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { copyText } from "../../lib/clipboard";
+import { truncateAddress } from "../../lib/utils";
 import type { CaregiverProfile, RecipientProfile } from "../../lib/types";
 import { Toast } from "../primitives/toast";
+import { ConfirmDialog } from "../primitives/confirm-dialog";
 import type { AgentInfo } from "../types";
 import { NETWORK_LABEL } from "../../lib/stellar-network";
 import { getTranslations, type Locale } from "../../i18n";
@@ -43,10 +46,16 @@ export function SettingsTab({
 }: SettingsTabProps) {
   const t = getTranslations(locale);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Issue #1257: brief loading feedback while the parent refetches data for a
+  // newly selected recipient. The switch completes when the parent applies the
+  // selection (selectedRecipientId/recipient props update).
+  const [switching, setSwitching] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toastFallback, setToastFallback] = useState<string | undefined>(undefined);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(false);
   const [form, setForm] = useState({
     recipientName: "",
     recipientAge: "",
@@ -59,30 +68,89 @@ export function SettingsTab({
     notifications: "",
   });
 
+  const initialForm = {
+    recipientName: recipient.name,
+    recipientAge: String(recipient.age ?? ""),
+    medications: (recipient.medications ?? []).join(", "),
+    doctor: recipient.doctor ?? "",
+    insurance: recipient.insurance ?? "",
+    caregiverName: caregiver.name,
+    relationship: caregiver.relationship ?? "",
+    location: caregiver.location ?? "",
+    notifications: caregiver.notifications ?? "",
+  };
+
+  const hasUnsavedChanges = editing && JSON.stringify(form) !== JSON.stringify(initialForm);
+
   const startEditing = () => {
-    setForm({
-      recipientName: recipient.name,
-      recipientAge: String(recipient.age ?? ""),
-      medications: (recipient.medications ?? []).join(", "),
-      doctor: recipient.doctor ?? "",
-      insurance: recipient.insurance ?? "",
-      caregiverName: caregiver.name,
-      relationship: caregiver.relationship ?? "",
-      location: caregiver.location ?? "",
-      notifications: caregiver.notifications ?? "",
-    });
+    setForm(initialForm);
     setEditing(true);
   };
 
-  const cancelEditing = () => setEditing(false);
+  const cancelEditing = () => {
+    setEditing(false);
+    setShowUnsavedDialog(false);
+    setPendingNavigation(false);
+  };
+
+  const handleDiscardChanges = () => {
+    setEditing(false);
+    setShowUnsavedDialog(false);
+  };
+
+  const handleKeepEditing = () => {
+    setShowUnsavedDialog(false);
+    setPendingNavigation(false);
+  };
+
+  const handleSelectRecipient = (id: string) => {
+    if (!onSelectRecipient || switching || id === (selectedRecipientId ?? "")) return;
+    setSwitching(true);
+    onSelectRecipient(id);
+  };
+
+  useEffect(() => {
+    setSwitching(false);
+  }, [selectedRecipientId, recipient]);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get("tab") || "overview";
+
+  // Issue #1276: Warn before leaving Settings tab if unsaved edits exist
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (currentTab !== "settings" && hasUnsavedChanges && !pendingNavigation) {
+      setShowUnsavedDialog(true);
+      setPendingNavigation(true);
+    }
+  }, [currentTab, hasUnsavedChanges, pendingNavigation]);
 
   const handleSave = async () => {
     setSaving(true);
+    // Trim, de-duplicate, and filter empty medication entries
+    const medicationList = [...new Set(
+      form.medications
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean)
+    )];
     await onUpdateProfile({
       recipient: {
         name: form.recipientName.trim() || recipient.name,
         age: form.recipientAge ? Number(form.recipientAge) : recipient.age,
-        medications: form.medications.split(",").map((m) => m.trim()).filter(Boolean),
+        medications: medicationList,
         doctor: form.doctor.trim() || recipient.doctor,
         insurance: form.insurance.trim() || recipient.insurance,
       },
@@ -119,6 +187,16 @@ export function SettingsTab({
       tabIndex={0}
       className="space-y-6 max-w-2xl"
     >
+      <ConfirmDialog
+        open={showUnsavedDialog}
+        title="Discard unsaved edits?"
+        description="You have unsaved changes to recipient and caregiver details. Do you want to discard them and leave this tab?"
+        confirmLabel="Discard edits"
+        cancelLabel="Keep editing"
+        destructive
+        onConfirm={handleDiscardChanges}
+        onCancel={handleKeepEditing}
+      />
       <Toast
         message={toastMsg}
         fallbackText={toastFallback}
@@ -127,21 +205,42 @@ export function SettingsTab({
           setToastFallback(undefined);
         }}
       />
+      {editing && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+          <div className="flex-1">
+            <p className="text-xs font-medium text-blue-900">Editing mode active</p>
+            <p className="text-xs text-blue-700 mt-0.5">Save your changes or click Cancel before switching tabs, or your edits will be lost.</p>
+          </div>
+        </div>
+      )}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-semibold text-slate-700">{t.settings.recipient}</h2>
             {recipients && recipients.length > 1 && onSelectRecipient && (
-              <select
-                className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                value={selectedRecipientId ?? ''}
-                onChange={(e) => onSelectRecipient(e.target.value)}
-                aria-label={t.settings.recipient}
-              >
-                {recipients.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-1.5" aria-busy={switching}>
+                <select
+                  className={`text-xs border border-slate-200 rounded-lg px-2 py-1 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 ${switching ? "opacity-60" : ""}`}
+                  value={selectedRecipientId ?? ''}
+                  onChange={(e) => handleSelectRecipient(e.target.value)}
+                  disabled={switching}
+                  aria-label={t.settings.recipient}
+                >
+                  {recipients.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+                {switching && (
+                  <span
+                    aria-hidden="true"
+                    data-testid="recipient-switch-spinner"
+                    className="inline-block w-3 h-3 border-2 border-sky-600 border-t-transparent rounded-full animate-spin"
+                  />
+                )}
+                <span role="status" className="sr-only">
+                  {switching ? t.common.loading : recipient.name}
+                </span>
+              </div>
             )}
           </div>
           {!editing && (
@@ -190,6 +289,7 @@ export function SettingsTab({
                 className={editClass + " w-full"}
                 value={form.medications}
                 onChange={(e) => setForm((f) => ({ ...f, medications: e.target.value }))}
+                placeholder="e.g., Lisinopril, Metformin, Atorvastatin"
                 aria-label={t.settings.medications}
               />
             ) : (
@@ -336,8 +436,11 @@ export function SettingsTab({
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">{t.wallet.agentWallet}</label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono break-all">
-                {agentInfo?.agentWallet || t.settings.notConnected}
+              <code
+                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                title={agentInfo?.agentWallet || ""}
+              >
+                {agentInfo?.agentWallet ? truncateAddress(agentInfo.agentWallet) : t.settings.notConnected}
               </code>
               {agentInfo?.agentWallet && (
                 <button
