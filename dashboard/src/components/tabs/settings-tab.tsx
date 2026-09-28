@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { copyText } from "../../lib/clipboard";
 import { truncateAddress } from "../../lib/utils";
 import type { CaregiverProfile, RecipientProfile } from "../../lib/types";
 import { Toast } from "../primitives/toast";
+import { ConfirmDialog } from "../primitives/confirm-dialog";
 import type { AgentInfo } from "../types";
 import { NETWORK_LABEL } from "../../lib/stellar-network";
 import { getTranslations, type Locale } from "../../i18n";
@@ -52,6 +54,8 @@ export function SettingsTab({
   const [toastFallback, setToastFallback] = useState<string | undefined>(undefined);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(false);
   const [form, setForm] = useState({
     recipientName: "",
     recipientAge: "",
@@ -64,22 +68,40 @@ export function SettingsTab({
     notifications: "",
   });
 
+  const initialForm = {
+    recipientName: recipient.name,
+    recipientAge: String(recipient.age ?? ""),
+    medications: (recipient.medications ?? []).join(", "),
+    doctor: recipient.doctor ?? "",
+    insurance: recipient.insurance ?? "",
+    caregiverName: caregiver.name,
+    relationship: caregiver.relationship ?? "",
+    location: caregiver.location ?? "",
+    notifications: caregiver.notifications ?? "",
+  };
+
+  const hasUnsavedChanges = editing && JSON.stringify(form) !== JSON.stringify(initialForm);
+
   const startEditing = () => {
-    setForm({
-      recipientName: recipient.name,
-      recipientAge: String(recipient.age ?? ""),
-      medications: (recipient.medications ?? []).join(", "),
-      doctor: recipient.doctor ?? "",
-      insurance: recipient.insurance ?? "",
-      caregiverName: caregiver.name,
-      relationship: caregiver.relationship ?? "",
-      location: caregiver.location ?? "",
-      notifications: caregiver.notifications ?? "",
-    });
+    setForm(initialForm);
     setEditing(true);
   };
 
-  const cancelEditing = () => setEditing(false);
+  const cancelEditing = () => {
+    setEditing(false);
+    setShowUnsavedDialog(false);
+    setPendingNavigation(false);
+  };
+
+  const handleDiscardChanges = () => {
+    setEditing(false);
+    setShowUnsavedDialog(false);
+  };
+
+  const handleKeepEditing = () => {
+    setShowUnsavedDialog(false);
+    setPendingNavigation(false);
+  };
 
   const handleSelectRecipient = (id: string) => {
     if (!onSelectRecipient || switching || id === (selectedRecipientId ?? "")) return;
@@ -90,6 +112,30 @@ export function SettingsTab({
   useEffect(() => {
     setSwitching(false);
   }, [selectedRecipientId, recipient]);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get("tab") || "overview";
+
+  // Issue #1276: Warn before leaving Settings tab if unsaved edits exist
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (currentTab !== "settings" && hasUnsavedChanges && !pendingNavigation) {
+      setShowUnsavedDialog(true);
+      setPendingNavigation(true);
+    }
+  }, [currentTab, hasUnsavedChanges, pendingNavigation]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -141,6 +187,16 @@ export function SettingsTab({
       tabIndex={0}
       className="space-y-6 max-w-2xl"
     >
+      <ConfirmDialog
+        open={showUnsavedDialog}
+        title="Discard unsaved edits?"
+        description="You have unsaved changes to recipient and caregiver details. Do you want to discard them and leave this tab?"
+        confirmLabel="Discard edits"
+        cancelLabel="Keep editing"
+        destructive
+        onConfirm={handleDiscardChanges}
+        onCancel={handleKeepEditing}
+      />
       <Toast
         message={toastMsg}
         fallbackText={toastFallback}
@@ -149,6 +205,14 @@ export function SettingsTab({
           setToastFallback(undefined);
         }}
       />
+      {editing && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+          <div className="flex-1">
+            <p className="text-xs font-medium text-blue-900">Editing mode active</p>
+            <p className="text-xs text-blue-700 mt-0.5">Save your changes or click Cancel before switching tabs, or your edits will be lost.</p>
+          </div>
+        </div>
+      )}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
