@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { copyText } from "../../lib/clipboard";
+import { truncateAddress } from "../../lib/utils";
 import { Toast } from "../primitives/toast";
 import type { AgentInfo } from "../types";
 import { EXPLORER_ACCOUNT_URL, NETWORK_LABEL } from "../../lib/stellar-network";
@@ -113,8 +114,11 @@ export function WalletTab({
               {t.wallet.walletAddress}
             </label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono break-all">
-                {agentInfo?.agentWallet || t.settings.notConnected}
+              <code
+                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                title={agentInfo?.agentWallet || ""}
+              >
+                {agentInfo?.agentWallet ? truncateAddress(agentInfo.agentWallet) : t.settings.notConnected}
               </code>
               {agentInfo?.agentWallet && (
                 <button

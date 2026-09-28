@@ -59,6 +59,35 @@ interface PolicyChangeRow {
   after: number;
   increased: boolean;
   doubled: boolean;
+  delta?: number;
+}
+
+function getImpactExplanation(rows: PolicyChangeRow[]): string {
+  const increases = rows.filter((r) => r.increased);
+  if (increases.length === 0) return "";
+
+  const deltas = increases.map((row) => {
+    const delta = row.after - row.before;
+    if (row.key === "monthlyLimit") {
+      return `the monthly limit by $${delta.toFixed(2)}`;
+    } else if (row.key === "medicationMonthlyBudget") {
+      return `the medication budget by $${delta.toFixed(2)}`;
+    } else if (row.key === "billMonthlyBudget") {
+      return `the bill budget by $${delta.toFixed(2)}`;
+    } else if (row.key === "dailyLimit") {
+      const monthlyDelta = delta * 30;
+      return `the daily limit by $${delta.toFixed(2)} (up to $${monthlyDelta.toFixed(2)}/month)`;
+    } else if (row.key === "approvalThreshold") {
+      return `the approval threshold by $${delta.toFixed(2)}`;
+    }
+    return "";
+  }).filter(Boolean);
+
+  if (deltas.length === 0) return "";
+  if (deltas.length === 1) {
+    return `In practice, this increases ${deltas[0]} without requiring your approval first.`;
+  }
+  return `In practice, this increases: ${deltas.join(", ")} — all without requiring your approval first.`;
 }
 
 export interface PolicyTabProps {
@@ -333,10 +362,15 @@ export function PolicyTab({
             >
               Confirm policy change
             </h3>
-            <p className="text-xs text-amber-700 mb-4">
+            <p className="text-xs text-amber-700 mb-2">
               You are raising one or more limits. This increases your spending
               exposure — please review before saving.
             </p>
+            {getImpactExplanation(confirmRows) && (
+              <p className="text-xs text-slate-700 mb-4 p-2 bg-amber-50 rounded border border-amber-200">
+                {getImpactExplanation(confirmRows)}
+              </p>
+            )}
 
             <ul className="space-y-2 mb-4">
               {confirmRows.map((row) => (
