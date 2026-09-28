@@ -199,6 +199,7 @@ export function OverviewTab({
                 ? t.tasks.agentPaused
                 : t.tasks.findCheapest
             }
+            estimatedTime={!agentPaused ? t.tasks.estimatedTime : undefined}
             busy={(loading && activeTask === "meds") || agentPaused}
             onClick={() => onRunTask(TASKS.meds, "meds")}
           />
@@ -209,6 +210,7 @@ export function OverviewTab({
                 ? t.tasks.agentPaused
                 : t.tasks.scanBill
             }
+            estimatedTime={!agentPaused ? t.tasks.estimatedTime : undefined}
             busy={(loading && activeTask === "bill") || agentPaused}
             onClick={() => onRunTask(TASKS.bill, "bill")}
           />
@@ -219,6 +221,7 @@ export function OverviewTab({
                 ? t.tasks.agentPaused
                 : t.tasks.demoPayment
             }
+            estimatedTime={!agentPaused ? t.tasks.estimatedTime : undefined}
             busy={(loading && activeTask === "block") || agentPaused}
             onClick={() => onRunTask(TASKS.block, "block")}
           />
@@ -248,7 +251,7 @@ export function OverviewTab({
           role="alert"
           className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 text-sm text-yellow-800"
         >
-          Task may be incomplete — agent ran out of steps
+          This task took longer than expected and may not have finished completely. Try running it again or breaking it into smaller tasks.
         </div>
       )}
 

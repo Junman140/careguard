@@ -87,6 +87,7 @@ export function DashboardHeader({
           </div>
           <div
             className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs ${agentConnected ? (agentPaused ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700") : "bg-red-50 text-red-600"}`}
+            title={agentPaused ? "Agent paused by caregiver" : undefined}
           >
             <div
               className={`w-1.5 h-1.5 rounded-full ${agentConnected ? (agentPaused ? "bg-amber-500" : "bg-green-500") : "bg-red-500"}`}

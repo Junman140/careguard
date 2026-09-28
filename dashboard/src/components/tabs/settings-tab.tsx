@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { copyText } from "../../lib/clipboard";
+import { truncateAddress } from "../../lib/utils";
 import type { CaregiverProfile, RecipientProfile } from "../../lib/types";
 import { Toast } from "../primitives/toast";
 import { ConfirmDialog } from "../primitives/confirm-dialog";
@@ -138,11 +139,18 @@ export function SettingsTab({
 
   const handleSave = async () => {
     setSaving(true);
+    // Trim, de-duplicate, and filter empty medication entries
+    const medicationList = [...new Set(
+      form.medications
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean)
+    )];
     await onUpdateProfile({
       recipient: {
         name: form.recipientName.trim() || recipient.name,
         age: form.recipientAge ? Number(form.recipientAge) : recipient.age,
-        medications: form.medications.split(",").map((m) => m.trim()).filter(Boolean),
+        medications: medicationList,
         doctor: form.doctor.trim() || recipient.doctor,
         insurance: form.insurance.trim() || recipient.insurance,
       },
@@ -281,6 +289,7 @@ export function SettingsTab({
                 className={editClass + " w-full"}
                 value={form.medications}
                 onChange={(e) => setForm((f) => ({ ...f, medications: e.target.value }))}
+                placeholder="e.g., Lisinopril, Metformin, Atorvastatin"
                 aria-label={t.settings.medications}
               />
             ) : (
@@ -427,8 +436,11 @@ export function SettingsTab({
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">{t.wallet.agentWallet}</label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono break-all">
-                {agentInfo?.agentWallet || t.settings.notConnected}
+              <code
+                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                title={agentInfo?.agentWallet || ""}
+              >
+                {agentInfo?.agentWallet ? truncateAddress(agentInfo.agentWallet) : t.settings.notConnected}
               </code>
               {agentInfo?.agentWallet && (
                 <button
