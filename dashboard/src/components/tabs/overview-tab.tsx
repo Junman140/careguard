@@ -140,6 +140,7 @@ export function OverviewTab({
                 ? t.tasks.agentPaused
                 : t.tasks.findCheapest
             }
+            estimatedTime={!agentPaused ? t.tasks.estimatedTime : undefined}
             busy={(loading && activeTask === "meds") || agentPaused}
             onClick={() => onRunTask(TASKS.meds, "meds")}
           />
@@ -150,6 +151,7 @@ export function OverviewTab({
                 ? t.tasks.agentPaused
                 : t.tasks.scanBill
             }
+            estimatedTime={!agentPaused ? t.tasks.estimatedTime : undefined}
             busy={(loading && activeTask === "bill") || agentPaused}
             onClick={() => onRunTask(TASKS.bill, "bill")}
           />
@@ -160,6 +162,7 @@ export function OverviewTab({
                 ? t.tasks.agentPaused
                 : t.tasks.demoPayment
             }
+            estimatedTime={!agentPaused ? t.tasks.estimatedTime : undefined}
             busy={(loading && activeTask === "block") || agentPaused}
             onClick={() => onRunTask(TASKS.block, "block")}
           />

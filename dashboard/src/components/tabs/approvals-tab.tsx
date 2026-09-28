@@ -41,13 +41,16 @@ export function ApprovalsTab({
     >
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h2 className="text-sm font-semibold text-slate-700 mb-4">
-          Pending Approvals
+          {t.approvals.pending}
         </h2>
         {!agentConnected && (
           <p className="text-xs text-slate-500">Agent not connected.</p>
         )}
         {agentConnected && approvals.length === 0 && (
-          <p className="text-xs text-slate-500">No pending approvals.</p>
+          <div>
+            <p className="text-xs text-slate-500 mb-2">{t.approvals.noPending}</p>
+            <p className="text-xs text-slate-400">{t.approvals.noPendingReassurance}</p>
+          </div>
         )}
         {approvals.length > 0 && (
           <div className="space-y-3">
@@ -68,25 +71,37 @@ export function ApprovalsTab({
                       {formatDateTime(new Date(tx.timestamp), locale)}
                     </div>
                     {tx.pendingUntil && (
-                      <div className="text-xs text-amber-600 mt-1">
-                        {(() => {
-                          try {
-                            const ms = new Date(tx.pendingUntil).getTime() - Date.now();
-                            const sec = Math.max(0, Math.ceil(ms / 1000));
-                            const announcedSec = sec <= 5 ? sec : Math.ceil(sec / 10) * 10;
-                            return (
-                              <>
-                                <span aria-hidden="true">Auto-approve in {sec}s</span>
-                                <span className="sr-only" aria-live="polite">
-                                  Auto-approve in {announcedSec} seconds
+                      (() => {
+                        try {
+                          const ms = new Date(tx.pendingUntil).getTime() - Date.now();
+                          const sec = Math.max(0, Math.ceil(ms / 1000));
+                          const announcedSec = sec <= 5 ? sec : Math.ceil(sec / 10) * 10;
+                          const totalTimeMs = new Date(tx.pendingUntil).getTime() - new Date(tx.timestamp).getTime();
+                          const elapsedMs = totalTimeMs - ms;
+                          const progressPercent = Math.min(100, Math.max(0, (elapsedMs / totalTimeMs) * 100));
+
+                          return (
+                            <div className="mt-3">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs text-amber-600 font-medium">
+                                  {sec > 0 ? t.approvals.autoApproveCountdown.replace("{seconds}", String(sec)) : t.approvals.countdownExpired}
                                 </span>
-                              </>
-                            );
-                          } catch {
-                            return null;
-                          }
-                        })()}
-                      </div>
+                              </div>
+                              <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-amber-500 transition-all"
+                                  style={{ width: `${progressPercent}%` }}
+                                />
+                              </div>
+                              <span className="sr-only" aria-live="polite">
+                                Auto-approve in {announcedSec} seconds
+                              </span>
+                            </div>
+                          );
+                        } catch {
+                          return null;
+                        }
+                      })()
                     )}
                   </div>
                   <div className="flex gap-2">
